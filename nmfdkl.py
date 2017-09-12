@@ -1,3 +1,4 @@
+import copy
 import warnings
 
 import numpy as np
@@ -28,7 +29,9 @@ def shift_row(a, shift):
     return a_roll
 
 class NMFDKL(object):
-    """
+    """Based on https://github.com/romi1502/NMF-matlab/blob/master/python/NMFD.py
+        https://github.com/romi1502/NMF-matlab/blob/master/NMFD/NMFD.m
+        https://github.com/romi1502/NMF-matlab/blob/master/NMFD/script_test_NMFD.m
     """
     _EPSILON = np.spacing(1)
 
@@ -48,7 +51,7 @@ class NMFDKL(object):
                 matrix.shape[0] == bases.shape[0]
                 and bases_size == bases.shape[1]
                 and factors == bases.shape[2])
-            self.bases = bases
+            self.bases = copy.deepcopy(bases)
         else:
             self.bases = np.random.rand(self.rows, bases_size, self.factors)
         # h
@@ -57,7 +60,7 @@ class NMFDKL(object):
                 factors == weights.shape[0]
                 and weights_size == weights.shape[1]
                 and matrix.shape[1] == weights.shape[2])
-            self.weights = weights
+            self.weights = copy.deepcopy(weights)
         else:
             self.weights = np.random.rand(
                 self.factors, weights_size, self.columns)
