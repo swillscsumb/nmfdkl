@@ -248,6 +248,6 @@ class NMFDKL(object):
         """
         """
         self.nmfdkl_iter(pre)
-        self.post_process()
+        self.post_process_rh()
         self.nmfdkl_iter(post)
         return self.reconstruct()
