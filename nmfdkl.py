@@ -167,7 +167,7 @@ class NMFDKL(object):
             for r in xrange(self.factors):
                 lam[m, :] += np.convolve(
                     self.bases[m, :, r],
-                    self.weights[r, _H_IDX, :])[:self.columns]
+                    self.weights[r, self._H_IDX, :])[:self.columns]
 
         return lam
 
@@ -187,7 +187,7 @@ class NMFDKL(object):
         weights_den = np.zeros((self.factors, self.columns))
 
         for t in xrange(self.bases.shape[1]):
-            weights_cs = self.shift_column(self.weights[:, _H_IDX, :], t).T
+            weights_cs = self.shift_column(self.weights[:, self._H_IDX, :], t).T
             self.bases[:, t, :] *= (
                 np.dot(vol, weights_cs)
                 /(np.dot(self.one, weights_cs) + self._EPSILON))
@@ -201,7 +201,7 @@ class NMFDKL(object):
             weights_num += np.dot(bases_t, vol_cs)
             weights_den += np.dot(bases_t, self.one)
 
-        self.weights[:, _H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
+        self.weights[:, self._H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
 
     def update_bases(self, vol):
         """
@@ -211,7 +211,7 @@ class NMFDKL(object):
         weights_cs = None
         for t in xrange(self.bases.shape[1]):
             if weights_cs is None:
-                weights_cs = self.weights[:, _H_IDX, :].T
+                weights_cs = self.weights[:, self._H_IDX, :].T
             else:
                 # use shift_row since we're shifting the transpose
                 weights_cs = self.shift_row(weights_cs, 1)
@@ -238,7 +238,7 @@ class NMFDKL(object):
             weights_num += np.dot(bases_t, vol_cs)
             weights_den += np.dot(bases_t, self.one)
 
-        self.weights[:, _H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
+        self.weights[:, self._H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
 
     def update_weights_conv(self, vol):
         """
@@ -256,7 +256,7 @@ class NMFDKL(object):
         for t in xrange(self.bases.shape[1]):
             bases_t = self.bases[:, t, :].T
             weights_den += np.dot(bases_t, self.one)
-        self.weights[:, _H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
+        self.weights[:, self._H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
 
     def update_weights_avg(self, vol):
         """
@@ -272,7 +272,7 @@ class NMFDKL(object):
                     self.one[m, :], bases_flip)[:self.columns]
 
         # average along t
-        self.weights[:, _H_IDX, :] *= hu/hd
+        self.weights[:, self._H_IDX, :] *= hu/hd
 
     def get_cost(self, vol, lam):
         """
@@ -317,19 +317,19 @@ class NMFDKL(object):
         """
         Post processing from NMF-matlab Romain Hennequin
         """
-        weights_max = np.max(self.weights[:, _H_IDX, :])/10.0
-        self.weights[:, _H_IDX, :] = (
-            np.maximum(self.weights[:, _H_IDX, :], weights_max)
+        weights_max = np.max(self.weights[:, self._H_IDX, :])/10.0
+        self.weights[:, self._H_IDX, :] = (
+            np.maximum(self.weights[:, self._H_IDX, :], weights_max)
             - weights_max + self._EPSILON)
 
     def post_process(self):
         """
         Insert exponential decay envelopes in weights
         """
-        d_env = self.decay(np.max(self.weights[:, _H_IDX, :]), self.bases.shape[1])
+        d_env = self.decay(np.max(self.weights[:, self._H_IDX, :]), self.bases.shape[1])
         for r in xrange(self.factors):
-            self.weights[r, _H_IDX, :] = np.convolve(
-                self.weights[r, _H_IDX, :], d_env)[:self.weights.shape[2]]
+            self.weights[r, self._H_IDX, :] = np.convolve(
+                self.weights[r, self._H_IDX, :], d_env)[:self.weights.shape[2]]
 
     def reconstruct(self):
         """
@@ -346,7 +346,7 @@ class NMFDKL(object):
         for r in xrange(self.factors):
             for m in xrange(self.rows):
                 v_out[m, :, r] += np.convolve(
-                    self.weights[r, _H_IDX, :],
+                    self.weights[r, self._H_IDX, :],
                     self.bases[m, :, r])[:self.columns]
                 v_out[m, :, -1] += v_out[m, :, r]
         return v_out
