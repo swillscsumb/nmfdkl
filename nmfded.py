@@ -2,7 +2,7 @@ import warnings
 
 import numpy as np
 
-class NMFDKL(object):
+class NMFDED(object):
     """
     Based on https://github.com/romi1502/NMF-matlab/ by Romain
     Hennequin
@@ -10,12 +10,27 @@ class NMFDKL(object):
     Implements Non-negative Matrix Factor Deconvolution (NMFD) as
     proposed by Smaragdis.
 
+    Uses Least Squares method from Schmidt and Morup and Wang,
+    Cichocki, and Chambers.
+
+    Schmidt, M. N. & Morup, M. (2006). Non-negative matrix factor 2-d
+        deconvolution for blind single channel source separation. Independent
+        Component Analysis, International Conference on (ICA), Springer
+        Lecture Notes in Computer Science, Vol.3889, 700-707.
+        Retrieved from http://mikkelschmidt.dk/papers/schmidt2006ica.pdf
+
     Smaragdis, P. (2004). Non-negative matrix factor deconvolution;
         extraction of multiple sound sources from monophonic inputs.
         Lecture Notes in Computer Science (including subseries Lecture
         Notes in Artificial Intelligence and Lecture Notes in
         Bioinformatics), 3195, 494-499. Retrieved from
         http://www.merl.com/reports/docs/TR2004-104.pdf
+
+    Wang, W., Cichocki, A., & Chambers. J. (2009). A multiplicative algorithm
+        for convolutive non-negative matrix factorization based on squared
+        euclidean distance. IEEE Transactions on Signal Processing, 57, (7),
+        2858-2864.
+
     """
     _EPSILON = np.spacing(1)
     _H_IDX = 0
@@ -25,7 +40,7 @@ class NMFDKL(object):
              weights=None, debug=True
              ):
         """
-        nmfdkl.NMFDKL(
+        nmfded.NMFDED
             matrix, factors, bases_size, bases=None, weights_size=1,
             weights=None)
         Parameters
@@ -180,10 +195,10 @@ class NMFDKL(object):
         vol = self.matrix/(lam + self._EPSILON)
         return vol, lam
 
-    def update_bases(self, vol):
+    def update_bases(self, lam):
         """
         dot product bases update
-        W = W * (((V/L)(H))/(1(H)))
+        W = W * (V(H.T))/(L(H.T))
         """
         weights_cs = None
         for t in xrange(self.bases.shape[1]):
@@ -193,46 +208,50 @@ class NMFDKL(object):
                 # use shift_row since we're shifting the transpose
                 weights_cs = self.shift_row(weights_cs, 1)
             self.bases[:, t, :] *= (
-                np.dot(vol, weights_cs)
-                /(np.dot(self.one, weights_cs) + self._EPSILON))
+                np.dot(self.matrix, weights_cs)
+                /(np.dot(lam, weights_cs) + self._EPSILON))
 
-    def update_weights(self, vol):
+    def update_weights(self, lam):
         """
         dot product weights update
-        H = H * (((W.T)(V/L))/((W)1))
+        H = H * (((W.T)V)/((W.T)L))
         """
-        vol_cs = None
+        v_cs = None
+        lam_cs = None
         weights_num = np.zeros((self.factors, self.columns))
         weights_den = np.zeros((self.factors, self.columns))
         for t in xrange(self.bases.shape[1]):
-            if vol_cs is None:
-                vol_cs = vol
+            if v_cs is None and lam_cs is None:
+                v_cs = self.matrix
+                lam_cs = lam
             else:
                 # left shift the prior array so we only have to zero one
                 # column
-                vol_cs = self.shift_column(vol_cs, -1)
+                v_cs = self.shift_column(v_cs, -1)
+                lam_cs = self.shift_column(lam_cs, -1)
             bases_t = self.bases[:, t, :].T
-            weights_num += np.dot(bases_t, vol_cs)
-            weights_den += np.dot(bases_t, self.one)
+            weights_num += np.dot(bases_t, v_cs)
+            weights_den += np.dot(bases_t, lam_cs)
 
         self.weights[:, self._H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
 
-    def update_weights_conv(self, vol):
+    def update_weights_conv(self, lam):
         """
         convolution weights update
-        H = H * (((W.T)(V/L))/((W)1))
+        H = H * (((W.T)V)/((W.T)L))
         """
-        vol_lr = np.fliplr(vol)
+        v_lr = np.fliplr(self.matrix)
+        lam_lr = np.fliplr(lam)
         weights_num = np.zeros((self.factors, self.columns))
         weights_den = np.zeros((self.factors, self.columns))
         for r in xrange(self.factors):
             for m in xrange(self.rows):
                 weights_num[r, :] += np.convolve(
-                    vol_lr[m, :], self.bases[m, :, r])[:self.columns]
+                    v_lr[m, :], self.bases[m, :, r])[:self.columns]
+                weights_den[r, :] += np.convolve(
+                    lam_lr[m, :], self.bases[m, :, r])[:self.columns]
         weights_num = np.fliplr(weights_num)
-        for t in xrange(self.bases.shape[1]):
-            bases_t = self.bases[:, t, :].T
-            weights_den += np.dot(bases_t, self.one)
+        weights_den = np.fliplr(weights_den)
         self.weights[:, self._H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
 
     def update_weights_avg(self, vol):
@@ -251,47 +270,45 @@ class NMFDKL(object):
         # average along t
         self.weights[:, self._H_IDX, :] *= hu/hd
 
-    def get_cost(self, vol, lam):
+    def get_cost(self, lam):
         """
-        Kullback-Leibler cost
-        D = ||V * ln(V/L) - V + L||
-                                   F
+        Euclidean distance cost
+        D = ||V - L||^2
         """
-        cost = np.linalg.norm(
-            self.matrix*np.log(vol + self._EPSILON) - self.matrix + lam,
-            'fro')
+        dist = self.matrix - lam
+        cost = np.linalg.norm(dist * dist, 'fro')
         return cost
 
-    def nmfdkl_iter(self, iterations):
+    def nmfded_iter(self, iterations):
         """
         Hennequin iteration algoritm
         """
         for i in xrange(iterations):
             if self._debug:
                 warnings.warn("iteration: {0:d}".format(i+1))
-            vol, lam = self.v_over_lambda()
-            cost = self.get_cost(vol, lam)
+            lam = self.lambda_()
+            cost = self.get_cost(lam)
             if self._debug:
                 warnings.warn("cost: {0}".format(str(cost)))
 
-            self.update_bases(vol)
-            vol, lam = self.v_over_lambda()
-            self.update_weights_avg(vol)
+            self.update_bases(lam)
+            lam = self.lambda_()
+            self.update_weights_avg(lam)
 
-    def nmfdkl_dm_iter(self, iterations):
+    def nmfded_dm_iter(self, iterations):
         """
         Dittmar and Muller like iteration algoritm
         """
         for i in xrange(iterations):
             if self._debug:
                 warnings.warn("iteration: {0:d}".format(i+1))
-            vol, lam = self.v_over_lambda()
-            cost = self.get_cost(vol, lam)
+            lam = self.lambda_()
+            cost = self.get_cost(lam)
             if self._debug:
                 warnings.warn("cost: {0}".format(str(cost)))
-            self.update_bases(vol)
-            vol, lam = self.v_over_lambda()
-            self.update_weights_conv(vol)
+            self.update_bases(lam)
+            lam = self.lambda_()
+            self.update_weights_conv(lam)
 
     def post_process_rh(self):
         """
@@ -334,10 +351,10 @@ class NMFDKL(object):
         return v_out
 
 
-    def nmfdkl(self, pre, post):
+    def nmfded(self, pre, post):
         """
         """
-        self.nmfdkl_dm_iter(pre)
+        self.nmfded_dm_iter(pre)
         self.post_process_rh()
-        self.nmfdkl_dm_iter(post)
+        self.nmfded_dm_iter(post)
         return self.reconstruct()
