@@ -13,7 +13,7 @@ class NMFDED(object):
     Uses Least Squares method from Schmidt and Morup and Wang,
     Cichocki, and Chambers.
 
-    Schmidt, M. N. & Morup, M. (2006). Non-negative matrix factor 2-d
+    Schmidt, M. N. & Morup, M. (2006). Non-negative matrix factor 2-d
         deconvolution for blind single channel source separation. Independent
         Component Analysis, International Conference on (ICA), Springer
         Lecture Notes in Computer Science, Vol.3889, 700-707.
