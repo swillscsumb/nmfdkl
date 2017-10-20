@@ -59,10 +59,12 @@ class NMFDKL(object):
             assert(
                 matrix.shape[0] == bases.shape[0]
                 and bases_size == bases.shape[1]
+                and bases_size <= bases.shape[0]
                 and factors == bases.shape[2])
             self.bases = bases.copy()
         else:
-            self.bases = np.random.rand(self.rows, bases_size, self.factors)
+            self.bases = np.random.rand(
+                self.rows, min(matrix.shape[0], bases_size), self.factors)
         # H
         if weights is not None:
             assert(
