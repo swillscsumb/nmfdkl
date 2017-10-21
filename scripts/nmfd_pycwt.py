@@ -21,7 +21,6 @@ def plot_wave(data, wave, power, scales, dt, ax):
     from wavelets.py
     """
     axis = -1
-    power = np.abs(wave.real)
     time = np.indices((data.shape[axis],)).squeeze() * dt
 
     Time, Scale = np.meshgrid(time, scales)
@@ -39,7 +38,8 @@ def wave_power(wave):
     from wavelets.py
     """
     # wavelet power spectrum
-    power = np.abs(wave) ** 2
+    power = np.abs(wave)
+    power *= power
     return power
 
 def scale_data(data, max):
