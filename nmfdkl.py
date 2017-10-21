@@ -229,11 +229,10 @@ class NMFDKL(object):
             for m in xrange(self.rows):
                 weights_num[r, :] += np.convolve(
                     vol_lr[m, :], self.bases[m, :, r])[:self.columns]
+                weights_den[r, 0] += self.bases[m, :, r].sum()
+            weights_den[r, :] = weights_den[r, 0] + self._EPSILON
         weights_num = np.fliplr(weights_num)
-        for t in xrange(self.bases.shape[1]):
-            bases_t = self.bases[:, t, :].T
-            weights_den += np.dot(bases_t, self.one)
-        self.weights[:, self._H_IDX, :] *= weights_num/(weights_den + self._EPSILON)
+        self.weights[:, self._H_IDX, :] *= weights_num/weights_den
 
     def update_weights_avg(self, vol):
         """
